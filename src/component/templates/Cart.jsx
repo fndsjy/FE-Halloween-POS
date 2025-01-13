@@ -10,8 +10,19 @@ const Cart = () => {
 
   useEffect(() => {
     const fetchCartItems = async () => {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        window.location.href = "/login"; // Redirect jika token tidak ada
+        return;
+      }
+
       try {
-        const response = await fetch("http://localhost:3001/api/carts");
+        const response = await fetch("http://localhost:3001/api/carts", {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
         if (!response.ok) throw new Error("Failed to fetch cart items");
 
         const data = await response.json();
@@ -25,42 +36,69 @@ const Cart = () => {
   }, []);
 
   const handleQuantityChange = async (productId, action) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      window.location.href = "/login"; // Redirect jika token tidak ada
+      return;
+    }
+  
     const item = cart.find(item => item.productId === productId);
     if (!item) return;
-
+  
+    // Mengirimkan request untuk menambah/mengurangi quantity
     try {
       const response = await fetch("http://localhost:3001/api/cart", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ productId, action }),
+        body: JSON.stringify({ productId, action }), // Kirim action yang sesuai
       });
-
+  
       if (!response.ok) throw new Error("Failed to update quantity");
-
-      const updatedResponse = await fetch("http://localhost:3001/api/carts");
+  
+      // Memperbarui cart setelah quantity diubah
+      const updatedResponse = await fetch("http://localhost:3001/api/carts", {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+  
       if (!updatedResponse.ok) throw new Error("Failed to fetch updated cart");
-
+  
       const updatedData = await updatedResponse.json();
       setCart(updatedData.cart || []);
     } catch (err) {
       setError(err.message);
     }
   };
-
+  
+  // Fungsi untuk handle penambahan
   const handleIncrease = (productId) => {
     handleQuantityChange(productId, 'add');
   };
-
+  
+  // Fungsi untuk handle pengurangan
   const handleDecrease = (productId) => {
     handleQuantityChange(productId, 'subtract');
-  };
+  };  
 
   const handleDelete = async (productId) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      window.location.href = "/login"; // Redirect jika token tidak ada
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:3001/api/cart/${productId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) throw new Error("Failed to remove item");
@@ -72,11 +110,18 @@ const Cart = () => {
   };
 
   const handleCheckout = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      window.location.href = "/login"; // Redirect jika token tidak ada
+      return;
+    }
+
     try {
       const response = await fetch("http://localhost:3001/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ cart })
       });
@@ -94,7 +139,7 @@ const Cart = () => {
     }
   };
 
-  const totalPrice = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const totalPrice = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
   const tax = totalPrice * 0.1;
   const grandTotal = totalPrice + tax;
   const isCartEmpty = cart.length === 0;
@@ -115,10 +160,10 @@ const Cart = () => {
             key={item.productId}
             className="flex items-center justify-between mx-4 py-2"
           >
-            <img src={item.image} alt={item.name} className="w-16 h-16 rounded" />
+            <img src={item.product.image} alt={item.product.name} className="w-16 h-16 rounded" />
             <div className="flex-1 ml-4 w-[75%]">
-              <h3 className="text-lg font-medium">{item.name}</h3>
-              <p className="truncate text-gray-500">{item.desc}</p>
+              <h3 className="text-lg font-medium">{item.product.name}</h3>
+              <p className="truncate text-gray-500">{item.product.desc}</p>
               <div className="flex items-center mt-2">
                 <button
                   onClick={() => handleDecrease(item.productId)}
@@ -134,23 +179,23 @@ const Cart = () => {
                   onChange={(e) => handleQuantityChange(item.productId, parseInt(e.target.value), item.maxStockCanBeMade)}
                   className="w-10 text-right text-black border-t border-b border-white"
                   min="1"
-                  max={item.maxStockCanBeMade}
+                  max={item.product.maxStockCanBeMade}
                 />
 
                 <button
                   onClick={() => handleIncrease(item.productId)}
                   className="px-2 py-1 text-sm text-white bg-orange-600 rounded-r"
-                  disabled={item.maxStockCanBeMade <= 0}
+                  disabled={item.product.maxStockCanBeMade <= 0}
                 >
                   +
                 </button>
               </div>
               <p className="mt-1 text-orange-500">
-                Stock available: {item.maxStockCanBeMade}
+                Stock available: {item.product.maxStockCanBeMade}
               </p>
             </div>
             <div className='w-[25%] text-right'>
-              <p className="text-lg font-semibold">Rp {formatPrice(item.price * item.quantity)}</p>
+              <p className="text-lg font-semibold">Rp {formatPrice(item.product.price * item.quantity)}</p>
               <button
                 onClick={() => handleDelete(item.productId)}
                 className="mt-2 text-center text-orange-500 hover:text-orange-700"
